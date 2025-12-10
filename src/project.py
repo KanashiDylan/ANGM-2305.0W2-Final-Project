@@ -1,239 +1,232 @@
 import random
 import time
 import sys
-from colorama import init, Fore, Style
+from colorama import Fore, Style, init
 
-# Initialize colorama for cross-platform color support
-init(autoreset=True)
+# --- Colorama Setup ---
+init(autoreset=True, convert=True)
 
-# --- Utility Functions (Typewriter-style printing) ---
-def print_and_hyber(text, delay=0.01):
+# --- Safe Color Helpers ---
+def ctext(color, text):
+    return f"{color}{text}{Style.RESET_ALL}"
+
+def cprint(color, text):
+    print(ctext(color, text))
+
+# --- Typewriter Printing ---
+def type_print(text, delay=0.02):
     for char in text:
         sys.stdout.write(char)
         sys.stdout.flush()
         time.sleep(delay)
     print()
 
-def print_and_sleep(text, delay=0.05):
+def sleep_print(text, delay=0.01):
     for char in text:
         sys.stdout.write(char)
         sys.stdout.flush()
         time.sleep(delay)
     print()
 
-def print_and_rise(text, delay=0.03):
-    for char in text:
-        sys.stdout.write(char)
-        sys.stdout.flush()
-        time.sleep(delay)
-    print()
-
-def print_and_wake(text, delay=0.1):
-    for char in text:
-        sys.stdout.write(char)
-        sys.stdout.flush()
-        time.sleep(delay)
-    print()
-
-# --- Player State ---
+# --- Player Data ---
 player = {
     "name": "Sora",
     "hp": 30,
-    "mp": 10,
     "max_hp": 30,
+    "mp": 10,
     "max_mp": 10,
-    "items": {"Potion": 2, "Ether": 1},
-    "world": 1,
     "xp": 0,
     "level": 1,
-    "miles": 0
+    "miles": 0,
+    "world": 1,
+    "items": ["Potion", "Ether", "Elixir"],
 }
 
-# --- World Names and Colors ---
+# --- World List w/ Colors ---
 world_names = {
     1: ("Realm of Darkness", Fore.MAGENTA),
     2: ("Traverse Town", Fore.YELLOW),
-    3: ("Hollow Bastion", Fore.LIGHTMAGENTA_EX)
+    3: ("Hollow Bastion", Fore.LIGHTMAGENTA_EX),
 }
 
 # --- Enemy Data ---
-enemies = {
-    1: [{"name": "Shadow", "hp": 8, "atk": (2, 4)}],
-    2: [{"name": "Soldier", "hp": 12, "atk": (3, 5)}],
-    3: [{"name": "Large Body", "hp": 18, "atk": (4, 6)}]
-}
+enemies = [
+    {"name": "Shadow", "hp": 8, "max_hp": 8, "dmg": (2, 4)},
+    {"name": "Soldier", "hp": 12, "max_hp": 12, "dmg": (2, 5)},
+    {"name": "Large Body", "hp": 20, "max_hp": 20, "dmg": (3, 6)},
+]
 
-# --- Restore Status ---
-def restore_status():
-    player["hp"] = player["max_hp"]
-    player["mp"] = player["max_mp"]
-    print_and_sleep(f"{Fore.GREEN}HP and {Fore.BLUE}MP fully restored!")
+# --- Bars ---
+def bar(current, max_value, width=15):
+    filled = int((current / max_value) * width)
+    empty = width - filled
+    return f"[{'=' * filled}{'-' * empty}]"
 
-# --- Display Bars ---
-def display_bars(name, hp, max_hp, mp=None, max_mp=None, is_enemy=False):
-    bar_length = 15
-    hp_ratio = max(0, min(hp/max_hp, 1))
-    filled = int(bar_length * hp_ratio)
-    empty = bar_length - filled
-    hp_bar = "=" * filled + "-" * empty
-    hp_color = Fore.GREEN if hp_ratio > 0.6 else Fore.YELLOW if hp_ratio > 0.3 else Fore.RED
+# --- Display Player Stats ---
+def show_stats(enemy=None):
+    # Player
+    print(ctext(Fore.CYAN, player["name"]))
+    hp_color = Fore.GREEN if player["hp"] > player["max_hp"] * 0.5 else Fore.YELLOW if player["hp"] > player["max_hp"] * 0.25 else Fore.RED
+    print(f"{ctext(Fore.GREEN, 'HP')} {ctext(hp_color, bar(player['hp'], player['max_hp']))} {player['hp']}/{player['max_hp']}")
+    print(f"{ctext(Fore.BLUE, 'MP')} {ctext(Fore.BLUE, bar(player['mp'], player['max_mp']))} {player['mp']}/{player['max_mp']}")
 
-    if mp is not None:
-        mp_ratio = max(0, min(mp/max_mp,1))
-        filled_mp = int(bar_length * mp_ratio)
-        empty_mp = bar_length - filled_mp
-        mp_bar = "=" * filled_mp + "-" * empty_mp
-        mp_color = Fore.BLUE
-    else:
-        mp_bar = ""
-        mp_color = ""
-
-    if is_enemy:
-        print(Fore.MAGENTA + f"{name}" + Style.RESET_ALL)
-        print(f"{Fore.GREEN}HP [{hp_bar}] {hp}/{max_hp}{Style.RESET_ALL}")
-    else:
-        print(Fore.CYAN + f"{name}" + Style.RESET_ALL)
-        print(f"{Fore.GREEN}HP [{hp_bar}] {hp}/{max_hp}{Style.RESET_ALL}")
-        if mp is not None:
-            print(f"{Fore.BLUE}MP [{mp_bar}] {mp}/{max_mp}{Style.RESET_ALL}")
-
-# --- XP Bar Display ---
-def display_xp_bar():
-    bar_length = 20
-    needed = player["level"] * 30
-    ratio = player["xp"] / needed
-    filled = int(bar_length * ratio)
-    bar = "=" * filled + "-" * (bar_length-filled)
-    print(Fore.GREEN + f"XP [{bar}] {player['xp']}/{needed}" + Style.RESET_ALL)
+    # Enemy
+    if enemy:
+        print(ctext(Fore.RED, enemy["name"]))
+        enemy_color = Fore.GREEN if enemy["hp"] > enemy["max_hp"] * 0.5 else Fore.YELLOW if enemy["hp"] > enemy["max_hp"] * 0.25 else Fore.RED
+        print(f"HP {ctext(enemy_color, bar(enemy['hp'], enemy['max_hp']))} {enemy['hp']}/{enemy['max_hp']}")
+    print()
 
 # --- Level Up ---
-def level_check():
-    while player["xp"] >= player["level"] * 30:
+def gain_xp(amount):
+    player["xp"] += amount
+    required = player["level"] * 30
+    if player["xp"] >= required:
+        player["xp"] -= required
         player["level"] += 1
+        type_print(ctext(Fore.GREEN, f"Level Up! You are now level {player['level']}"))
+        # Heal on level up
         player["max_hp"] += 5
         player["max_mp"] += 2
-        restore_status()
-        print_and_sleep(f"Level Up! Now Level {player['level']}!")
+        player["hp"] = player["max_hp"]
+        player["mp"] = player["max_mp"]
 
-# --- Items ---
-def use_item():
-    print("Your items:", player["items"])
-    item = input("Use which item? ").capitalize()
-    if item in player["items"] and player["items"][item] > 0:
-        if item == "Potion":
-            player["hp"] = min(player["hp"] + 15, player["max_hp"])
-            player["items"][item] -= 1
-            print_and_sleep(f"{Fore.GREEN}Potion used! +15 HP{Style.RESET_ALL}")
-        elif item == "Ether":
-            player["mp"] = min(player["mp"] + 5, player["max_mp"])
-            player["items"][item] -= 1
-            print_and_sleep(f"{Fore.BLUE}Ether used! +5 MP{Style.RESET_ALL}")
-    else:
-        print_and_sleep("Can't use that.")
+# --- Rewards ---
+def give_reward():
+    item = random.choice(["Potion", "Ether", "Elixir"])
+    cprint(Fore.YELLOW, f"You received: {item}!")
+    if item == "Potion":
+        player["items"].append(item)
+    elif item == "Ether":
+        player["items"].append(item)
+    elif item == "Elixir":
+        player["items"].append(item)
+
+# --- Magic Damage ---
+def magic_spell():
+    print("Choose a spell:")
+    print(ctext(Fore.RED, "1) Firaga"))
+    print(ctext(Fore.YELLOW, "2) Thundaga"))
+    print(ctext(Fore.BLUE, "3) Blizzaga"))
+    choice = input("> ")
+    if choice == "1":
+        return "Firaga", Fore.RED, random.randint(6, 12)
+    if choice == "2":
+        return "Thundaga", Fore.YELLOW, random.randint(7, 13)
+    if choice == "3":
+        return "Blizzaga", Fore.BLUE, random.randint(5, 11)
+    return None, None, 0
 
 # --- Battle System ---
 def battle():
-    enemy = random.choice(enemies[player["world"]]).copy()
-    e_hp = enemy["hp"]
-    print_and_sleep(Fore.MAGENTA + f"A {enemy['name']} appears!" + Style.RESET_ALL)
+    enemy = random.choice(enemies)
+    enemy = {**enemy}  # local copy
+    type_print(ctext(Fore.MAGENTA, f"A {enemy['name']} appears!"))
 
-    while player["hp"] > 0 and e_hp > 0:
-        display_bars(player["name"], player["hp"], player["max_hp"], player["mp"], player["max_mp"])
-        display_bars(enemy["name"], e_hp, enemy["hp"], is_enemy=True)
+    while enemy["hp"] > 0 and player["hp"] > 0:
+        show_stats(enemy)
         print("1) Attack  2) Magic  3) Item  4) Run")
-        choice = input("> ")
+        cmd = input("> ")
 
-        if choice == "1":
-            dmg = random.randint(3,6)
-            e_hp -= dmg
-            print_and_sleep(f"You strike fiercely! {Fore.RED}{dmg} DMG{Style.RESET_ALL}")
-        elif choice == "2":
-            magic_choice = input("Choose a spell: 1) Firaga 2) Thundaga 3) Blizzaga\n> ")
-            if magic_choice == "1":
-                dmg = random.randint(6,12)
-                e_hp -= dmg
-                print_and_sleep(Fore.RED + f"Firaga hits with {dmg} DMG!" + Style.RESET_ALL)
-            elif magic_choice == "2":
-                dmg = random.randint(6,12)
-                e_hp -= dmg
-                print_and_sleep(Fore.YELLOW + f"Thundaga hits with {dmg} DMG!" + Style.RESET_ALL)
-            elif magic_choice == "3":
-                dmg = random.randint(6,12)
-                e_hp -= dmg
-                print_and_sleep(Fore.BLUE + f"Blizzaga hits with {dmg} DMG!" + Style.RESET_ALL)
-            else:
-                print_and_sleep("Invalid magic!")
-        elif choice == "3":
-            use_item()
-        elif choice == "4":
-            print_and_sleep("You escape safely!")
+        # --- Attack ---
+        if cmd == "1":
+            dmg = random.randint(3, 6)
+            enemy["hp"] = max(enemy["hp"] - dmg, 0)
+            type_print(f"You strike fiercely! {ctext(Fore.RED, str(dmg)+' DMG')}")
+        # --- Magic ---
+        elif cmd == "2":
+            if player["mp"] < 3:
+                type_print("Not enough MP!")
+                continue
+            spell, color, dmg = magic_spell()
+            if not spell:
+                continue
+            player["mp"] -= 3
+            enemy["hp"] = max(enemy["hp"] - dmg, 0)
+            type_print(ctext(color, f"{spell} hits for {dmg} DMG!"))
+        # --- Item ---
+        elif cmd == "3":
+            if not player["items"]:
+                type_print("No items!")
+                continue
+            print("Choose item:")
+            for i, it in enumerate(player["items"]):
+                print(f"{i+1}) {it}")
+            idx = int(input("> ")) - 1
+            item = player["items"].pop(idx)
+            if item == "Potion":
+                player["hp"] = min(player["hp"] + 25, player["max_hp"])
+            elif item == "Ether":
+                player["mp"] = min(player["mp"] + 10, player["max_mp"])
+            elif item == "Elixir":
+                player["hp"] = min(player["hp"] + 20, player["max_hp"])
+                player["mp"] = min(player["mp"] + 20, player["max_mp"])
+            type_print(ctext(Fore.GREEN, f"{item} used!"))
+        # --- Run ---
+        elif cmd == "4":
+            type_print("You escape!")
             return
         else:
-            print_and_sleep("Invalid choice!")
+            continue
 
-        if e_hp > 0:
-            edmg = random.randint(*enemy["atk"])
-            player["hp"] -= edmg
-            print_and_sleep(f"{enemy['name']} strikes back! {Fore.RED}{edmg} DMG{Style.RESET_ALL}")
+        # enemy turn
+        if enemy["hp"] > 0:
+            dmg = random.randint(*enemy["dmg"])
+            player["hp"] = max(player["hp"] - dmg, 0)
+            type_print(f"{enemy['name']} strikes back! {ctext(Fore.RED, str(dmg)+' DMG')}")
 
     if player["hp"] > 0:
-        xp_gain = 10 * player["world"]
-        player["xp"] += xp_gain
-        drop = random.choice(["Potion", "Ether", "Elixir"])
-        player["items"].setdefault(drop,0)
-        player["items"][drop] += 1
-        print_and_sleep(Fore.YELLOW + f"You have received {drop}!" + Style.RESET_ALL)
-        display_xp_bar()
-        level_check()
-    else:
-        print_and_sleep("You lost... Your heart fades.")
-        restore_status()
+        type_print(ctext(Fore.GREEN, f"You defeated {enemy['name']}!"))
+        gain_xp(15)
+        give_reward()
 
-# --- Actions ---
+# --- Travel ---
+
+def get_world():
+    name, color = world_names[player["world"]]
+    return ctext(color, name)
+
 def travel():
     distance = random.randint(30, 60)
     player["miles"] += distance
-    print_and_sleep(f"You travel forward... {distance} miles covered! Total miles: {player['miles']}")
+    type_print(f"You travel: {distance} miles (Total: {player['miles']})")
     if random.random() < 0.3:
         battle()
     if player["miles"] >= player["world"] * 150 and player["world"] < 3:
         player["world"] += 1
-        name, color = world_names[player["world"]]
-        print_and_sleep(f"You have arrived at {color}{name}{Style.RESET_ALL}!")
+        type_print(f"You have arrived at {get_world()}!")
 
+# --- Rest ---
 def rest():
-    restore_status()
+    player["hp"] = player["max_hp"]
+    player["mp"] = player["max_mp"]
+    type_print("You rest and recover...")
 
+# --- Venture ---
 def venture():
-    print_and_sleep("You search the area...")
-    found = random.choice(["Potion", "Ether", None])
-    if found:
-        player["items"].setdefault(found,0)
-        player["items"][found] += 1
-        color = Fore.GREEN if found=="Potion" else Fore.BLUE
-        print_and_sleep(f"You found {color}{found}{Style.RESET_ALL}!")
+    type_print("You explore the area...")
+    if random.random() < 0.4:
+        give_reward()
     else:
-        print_and_sleep("Nothing found...")
-    if random.random() < 0.5:
-        battle()
+        type_print("Nothing found...")
 
 # --- Game Loop ---
 def game_loop():
-    print_and_sleep("Your heart is your guiding key...")
+    type_print("Your heart is your guiding key...")
     while player["world"] <= 3 and player["hp"] > 0:
-        name, color = world_names[player["world"]]
-        print(f"\nCurrent World: {color}{name}{Style.RESET_ALL}")
+        print()
+        print(f"Current World: {get_world()}")
         print("1) Travel  2) Rest  3) Venture")
         cmd = input("> ")
         if cmd == "1": travel()
         elif cmd == "2": rest()
         elif cmd == "3": venture()
-        else: print_and_sleep("Invalid command!")
+        else: type_print("Invalid option.")
 
     if player["hp"] > 0:
-        print_and_wake("You have reached the final destination... Victory!")
+        type_print("You reach the final world... Victory!")
     else:
-        print_and_wake("Game Over... Your heart fades.")
+        type_print("Your heart fades...")
 
-# --- Start Game ---
 game_loop()
+
